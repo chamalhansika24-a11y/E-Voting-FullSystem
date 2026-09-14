@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - E-Voting</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans p-8">
+
+    <div class="max-w-4xl mx-auto space-y-8">
+        <h1 class="text-3xl font-bold text-center text-blue-700">E-Voting Admin Dashboard</h1>
+
+        <!-- 1. Election Scheduling Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4 border-b pb-2">1. Schedule Election</h2>
+            <form id="scheduleForm" class="space-y-4">
+                <div>
+                    <label class="block font-medium">Election Title</label>
+                    <input type="text" id="title" required class="w-full border p-2 rounded" placeholder="e.g., Annual Election 2026">
+                </div>
+                <div>
+                    <label class="block font-medium">Question</label>
+                    <input type="text" id="question" required class="w-full border p-2 rounded" placeholder="e.g., Who will be the next president?">
+                </div>
+                <div>
+                    <label class="block font-medium">Candidates (Comma separated)</label>
+                    <input type="text" id="candidates" required class="w-full border p-2 rounded" placeholder="e.g., Candidate A, Candidate B, Candidate C">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-medium">Start Time</label>
+                        <input type="datetime-local" id="startTime" required class="w-full border p-2 rounded">
+                    </div>
+                    <div>
+                        <label class="block font-medium">End Time</label>
+                        <input type="datetime-local" id="endTime" required class="w-full border p-2 rounded">
+                    </div>
+                </div>
+                <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition">Schedule Election</button>
+            </form>
+        </div>
+
+        <!-- 2. CSV Upload Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4 border-b pb-2">2. Voter Registration (CSV Upload)</h2>
+            <form id="uploadForm" class="space-y-4">
+                <p class="text-sm text-gray-600">Note: The CSV file MUST contain a column named <b>email</b>.</p>
+                <div>
+                    <input type="file" id="voterFile" accept=".csv" required class="block w-full border p-2 rounded">
+                </div>
+                <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition">Upload & Send Emails</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:5001/api/admin";
+
+        // 1. Submit Schedule Form
+        document.getElementById("scheduleForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                title: document.getElementById("title").value,
+                question: document.getElementById("question").value,
+                candidates: document.getElementById("candidates").value.split(",").map(c => c.trim()),
+                startTime: document.getElementById("startTime").value,
+                endTime: document.getElementById("endTime").value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/schedule`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if(response.ok) {
+                    alert("Success: " + data.message);
+                } else {
+                    alert("Error: " + data.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Server connection error.");
+            }
+        });
+
+        // 2. Submit CSV Upload Form
+        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById("voterFile");
+            const formData = new FormData();
+            formData.append("voterFile", fileInput.files[0]);
+
+            try {
+                const response = await fetch(`${API_URL}/upload-voters`, {
+                    method: "POST",
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if(response.ok) {
+                    alert("Success: " + data.message);
+                } else {
+                    alert("Error: " + data.error);
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Server connection error.");
+            }
+        });
+    </script>
+</body>
+</html>

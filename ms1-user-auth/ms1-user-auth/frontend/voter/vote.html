@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cast Your Vote</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-blue-700">E-Voting Portal</h2>
+            <button id="btnLogout" class="text-sm bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition">Logout</button>
+        </div>
+        
+        <p class="text-gray-600 mb-6 font-medium">Please select your preferred candidate:</p>
+
+        <form id="voteForm" class="space-y-4">
+            <!-- Candidate 1 -->
+            <label class="block border p-4 rounded-lg cursor-pointer hover:bg-blue-50 transition">
+                <div class="flex items-center">
+                    <input type="radio" name="candidate" value="Candidate_A" class="w-5 h-5 text-blue-600">
+                    <span class="ml-3 text-lg font-semibold text-gray-800">Candidate A (Party X)</span>
+                </div>
+            </label>
+
+            <!-- Candidate 2 -->
+            <label class="block border p-4 rounded-lg cursor-pointer hover:bg-blue-50 transition">
+                <div class="flex items-center">
+                    <input type="radio" name="candidate" value="Candidate_B" class="w-5 h-5 text-blue-600">
+                    <span class="ml-3 text-lg font-semibold text-gray-800">Candidate B (Party Y)</span>
+                </div>
+            </label>
+
+            <!-- Candidate 3 -->
+            <label class="block border p-4 rounded-lg cursor-pointer hover:bg-blue-50 transition">
+                <div class="flex items-center">
+                    <input type="radio" name="candidate" value="Candidate_C" class="w-5 h-5 text-blue-600">
+                    <span class="ml-3 text-lg font-semibold text-gray-800">Candidate C (Party Z)</span>
+                </div>
+            </label>
+
+            <button type="submit" class="w-full bg-green-600 text-white font-semibold py-3 rounded hover:bg-green-700 transition mt-6">
+                Cast Vote
+            </button>
+        </form>
+
+        <p id="statusMsg" class="mt-4 text-center text-sm font-medium"></p>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:5001/api";
+        
+        // 1. පිටුව Load වනවිට JWT Token එක තිබේදැයි බැලීම (Security Check)
+        const token = sessionStorage.getItem("voterToken");
+        if (!token) {
+            alert("Unauthorized Access! Please login first.");
+            // Token එකක් නැත්නම් ආපසු ලියාපදිංචි/ලොගින් පිටුවට යවන්න
+            window.location.href = "register.html"; 
+        }
+
+        // 2. Logout බොත්තම ක්‍රියාත්මක කිරීම
+        document.getElementById("btnLogout").addEventListener("click", () => {
+            sessionStorage.removeItem("voterToken"); // Token එක මකා දැමීම
+            window.location.href = "register.html";
+        });
+
+        const showStatus = (msg, isError = false) => {
+            const statusEl = document.getElementById("statusMsg");
+            statusEl.textContent = msg;
+            statusEl.className = `mt-4 text-center text-sm font-medium ${isError ? 'text-red-600' : 'text-green-600'}`;
+        };
+
+        // 3. ඡන්දය සර්වර් එකට යැවීම (Submit Vote)
+        document.getElementById("voteForm").addEventListener("submit", async (e) => {
+            e.preventDefault(); // පිටුව Refresh වීම නැවැත්වීම
+            
+            const selectedCandidate = document.querySelector('input[name="candidate"]:checked');
+            
+            if (!selectedCandidate) {
+                return showStatus("Please select a candidate before voting!", true);
+            }
+
+            const candidateValue = selectedCandidate.value;
+            showStatus("Submitting your vote...");
+
+            try {
+                // Token එක Header එකේ යවමින් Backend එකට Request එක යැවීම
+                const response = await fetch(`${API_URL}/vote`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` // මෙතැනින් තමයි පරිශීලකයා කවුද කියලා සර්වර් එක හඳුනාගන්නේ
+                    },
+                    body: JSON.stringify({ candidate: candidateValue })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus("Vote Cast Successfully! Thank you.");
+                    // සාර්ථක වුණාට පස්සේ Form එක Disable කිරීම
+                    document.querySelectorAll('input').forEach(input => input.disabled = true);
+                    document.querySelector('button[type="submit"]').disabled = true;
+                    document.querySelector('button[type="submit"]').classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    showStatus("Error: " + data.error, true);
+                }
+            } catch (error) {
+                console.error(error);
+                showStatus("Error connecting to server.", true);
+            }
+        });
+    </script>
+</body>
+</html>

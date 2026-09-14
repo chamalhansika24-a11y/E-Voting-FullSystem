@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voter Registration & Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- WebAuthn Browser Package -->
+    <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md text-center">
+        <h2 class="text-2xl font-bold text-blue-700 mb-2">Voter Portal</h2>
+        <p class="text-gray-600 mb-6">Secure Biometric Authentication</p>
+
+        <div class="mb-4 text-left">
+            <label class="block font-medium text-gray-700">Email Address</label>
+            <input type="email" id="email" readonly class="w-full border p-2 rounded bg-gray-100 text-gray-600 mt-1">
+        </div>
+
+        <div class="space-y-4 mt-6">
+            <button id="btnRegister" class="w-full bg-green-600 text-white font-semibold py-2 rounded hover:bg-green-700 transition">
+                1. Register Fingerprint/FaceID
+            </button>
+            <button id="btnLogin" class="w-full bg-blue-600 text-white font-semibold py-2 rounded hover:bg-blue-700 transition">
+                2. Login & Get Voting Token
+            </button>
+        </div>
+
+        <p id="statusMsg" class="mt-4 text-sm font-medium text-gray-800"></p>
+    </div>
+
+    <script>
+        const { startRegistration, startAuthentication } = SimpleWebAuthnBrowser;
+        const API_URL = "http://localhost:5001/api/auth";
+
+        // URL එකෙන් ඊමේල් එක ලබා ගැනීම (උදා: ?email=test@example.com)
+        const urlParams = new URLSearchParams(window.location.search);
+        const userEmail = urlParams.get('email');
+
+        if (userEmail) {
+            document.getElementById("email").value = userEmail;
+        } else {
+            alert("Error: No email provided in the URL.");
+        }
+
+        const showStatus = (msg, isError = false) => {
+            const statusEl = document.getElementById("statusMsg");
+            statusEl.textContent = msg;
+            statusEl.className = `mt-4 text-sm font-medium ${isError ? 'text-red-600' : 'text-green-600'}`;
+        };
+
+        // 1. Biometric Registration
+        document.getElementById("btnRegister").addEventListener("click", async () => {
+            if (!userEmail) return alert("Email is missing!");
+            showStatus("Requesting registration options...");
+
+            try {
+                // Step A: Options ලබාගැනීම
+                const resp1 = await fetch(`${API_URL}/register/options`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail })
+                });
+                const options = await resp1.json();
+                if (options.error) throw new Error(options.error);
+
+                // Browser එකේ Fingerprint Scanner එක Pop-up කිරීම
+                const attResp = await startRegistration(options);
+
+                // Step B: Result එක Verify කිරීම
+                const resp2 = await fetch(`${API_URL}/register/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail, response: attResp })
+                });
+                const verification = await resp2.json();
+
+                if (verification.verified) {
+                    showStatus("Registration Successful! You can now login.");
+                } else {
+                    showStatus("Failed: " + (verification.error || "Unknown error"), true);
+                }
+            } catch (error) {
+                console.error(error);
+                showStatus("Error during registration: " + error.message, true);
+            }
+        });
+
+        // 2. Biometric Login & Get JWT Token
+        document.getElementById("btnLogin").addEventListener("click", async () => {
+            if (!userEmail) return alert("Email is missing!");
+            showStatus("Requesting login options...");
+
+            try {
+                // Step C: Options ලබාගැනීම
+                const resp1 = await fetch(`${API_URL}/login/options`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail })
+                });
+                const options = await resp1.json();
+                if (options.error) throw new Error(options.error);
+
+                // Browser එකේ Scanner එකෙන් ඇඟිලි සලකුණ ඉල්ලීම
+                const asseResp = await startAuthentication(options);
+
+                // Step D: Verify කර JWT ලබාගැනීම
+                const resp2 = await fetch(`${API_URL}/login/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail, response: asseResp })
+                });
+                const verification = await resp2.json();
+
+                if (verification.verified) {
+                    showStatus("Login Successful! Redirecting...");
+                    console.log("JWT Token:", verification.token);
+                    
+                    // Token එක Session Storage එකේ සටහන් කිරීම
+                    sessionStorage.setItem("voterToken", verification.token);
+                    
+                    // සාර්ථකව Token එක ලැබුණු පසු vote.html පිටුවට ස්වයංක්‍රීයව යොමු කිරීම
+                    window.location.href = "vote.html";
+                } else {
+                    showStatus("Login Failed.", true);
+                }
+            } catch (error) {
+                console.error(error);
+                showStatus("Error during login: " + error.message, true);
+            }
+        });
+    </script>
+</body>
+</html>

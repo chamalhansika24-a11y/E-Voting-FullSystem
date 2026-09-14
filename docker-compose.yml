@@ -1,0 +1,41 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: evote_mongo
+    ports:
+      - "27017:27017"
+    restart: always
+
+  auth-admin-service:
+    build: ./ms1-user-auth/ms1-user-auth
+    container_name: ms1_auth
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - MONGO_URI=mongodb://mongodb:27017/evoting_db
+      - MS2_URL=http://ms2_voting:5002/api/vote/cast
+    depends_on:
+      - mongodb
+    restart: always
+
+  voting-core-service:
+    build: ./microservice-2-voting
+    container_name: ms2_voting
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - CONTRACT_ADDRESS=0x91Bb55CdF20E3d11C651861F4893A90917869405
+      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:7545
+    restart: always
+
+  results-engine-service:
+    build: ./microservice-3-results
+    container_name: ms3_results
+    ports:
+      - "5003:5003"
+    environment:
+      - CONTRACT_ADDRESS=0x91Bb55CdF20E3d11C651861F4893A90917869405
+      - BLOCKCHAIN_RPC_URL=http://host.docker.internal:7545
+    restart: always
